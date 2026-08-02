@@ -31,11 +31,65 @@ exactly those three RPCs, and `inspect_network` composes them into one
 
 ## Terminal output
 
-TODO: paste the real output of the three bitcoin-cli commands above. It must show the `chain` field reading `regtest`, the numeric block height, and the best-block hash. Also paste the `cargo test --test lab_01` result line showing 4 passed.
+```
+$ bitcoin-cli getblockchaininfo
+{
+  "chain": "regtest",
+  "blocks": 1,
+  "headers": 1,
+  "bestblockhash": "017a5657e2a0f19793a02933cfc42f886cd7e72c47fe0fc27e335cde091024ed",
+  "bits": "207fffff",
+  "target": "7fffff0000000000000000000000000000000000000000000000000000000000",
+  "difficulty": 4.656542373906925e-10,
+  "time": 1785651764,
+  "mediantime": 1785651764,
+  "verificationprogress": 1,
+  "initialblockdownload": false,
+  "chainwork": "0000000000000000000000000000000000000000000000000000000000000004",
+  "size_on_disk": 590,
+  "pruned": false,
+  "warnings": [
+  ]
+}
+
+$ bitcoin-cli getblockcount
+1
+
+$ bitcoin-cli getbestblockhash
+017a5657e2a0f19793a02933cfc42f886cd7e72c47fe0fc27e335cde091024ed
+```
+
+The three results agree with each other: `chain` reads `regtest`, the height is 1,
+and the `bestblockhash` field inside `getblockchaininfo` matches the standalone
+`getbestblockhash` result. Height 1 is the freshly created network, one block past
+the regtest genesis block.
+
+```
+$ cargo test --test lab_01
+running 4 tests
+test reads_block_height ... ok
+test reads_best_block_hash ... ok
+test reads_regtest_chain ... ok
+test builds_verified_network_snapshot ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
 
 ## Evidence references
 
-TODO: screenshot required. Capture the Polar window showing the network named `Week 1 Bitcoin Fundamentals` with the Bitcoin Core node in the **Started** state. Save it as `submissions/evidence/lab01-polar-network.png` and link it here as `![Polar network](evidence/lab01-polar-network.png)`. This is the only evidence that proves you used Polar rather than a bare bitcoind, so do not skip it.
+![Polar network](evidence/lab01-polar-network.png)
+
+The screenshot shows the Polar window with the network `Week 1 Bitcoin Fundamentals`
+marked **Started**, the single Bitcoin Core node `backend1` on the designer canvas,
+and the height indicator reading 1, matching the `getblockcount` output above. No
+Lightning nodes are present, since Lab 01 only requires a Bitcoin Core backend.
+
+![Node terminal](evidence/lab01-node-terminal.png)
+
+The second screenshot is the node's own terminal, opened from Polar with right-click
+→ Launch Terminal. The `bitcoin@backend1` prompt confirms the three RPCs ran inside
+the container rather than against a separate local node, and the values there match
+the Terminal output section above.
 
 ## Explanation
 
