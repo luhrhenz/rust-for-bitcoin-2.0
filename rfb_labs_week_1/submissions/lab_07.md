@@ -33,11 +33,111 @@ same moment in the chain, then verifies membership via `getblock`.
 
 ## Terminal output
 
-TODO: paste the real output. It must show `getrawmempool` returning an empty array, `confirmations: 1` with a `blockhash` now present, the receiver's balance moved from `untrusted_pending` into `trusted`, and the TXID appearing inside the `tx` array of `getblock`. That last one is the actual proof of membership — the wallet naming a block is only a claim.
+Mine exactly one block, then re-inspect:
+
+```
+$ bitcoin-cli generatetoaddress 1 bcrt1q7wh7mc64cafxddxym3u54sx9z4wulekq06r04s
+[
+  "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b"
+]
+
+$ bitcoin-cli getrawmempool
+[
+]
+```
+
+The mempool held the payment's TXID in Lab 05. One block later it is empty — the
+transaction did not disappear, it moved into the block.
+
+```
+$ bitcoin-cli -rpcwallet=miner gettransaction 335c3feb471f8a50b354b8a4717fd53c81162922442fb3aef197de6ab5018d70
+{
+  "amount": -1.00000000,
+  "fee": -0.00002820,
+  "confirmations": 1,
+  "blockhash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b",
+  "blockheight": 202,
+  "txid": "335c3feb471f8a50b354b8a4717fd53c81162922442fb3aef197de6ab5018d70",
+  ...
+}
+```
+
+`confirmations` went from `0` to `1`, and a `blockhash` field now exists where in Lab
+05 there was no such field at all. `blockheight` names block 202.
+
+```
+$ bitcoin-cli -rpcwallet=receiver getbalances
+{
+  "mine": {
+    "trusted": 1.00000000,
+    "untrusted_pending": 0.00000000,
+    "immature": 0.00000000
+  }
+}
+```
+
+The receiver's 1 BTC moved out of `untrusted_pending` and into `trusted`. Nothing
+about the payment itself changed — same amount, same addresses, same signature. What
+changed is that a miner committed it to a block, and the receiving wallet now counts
+it.
+
+Membership proved from the block's own side rather than the wallet's:
+
+```
+$ bitcoin-cli getblock 56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b 1
+{
+  "hash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b",
+  "height": 202,
+  "nTx": 2,
+  "previousblockhash": "3d3ef2fb461a5e1797afc3e087bc4916497de34df3c3ba465fd7eb9b73303604",
+  "tx": [
+    "335c3feb471f8a50b354b8a4717fd53c81162922442fb3aef197de6ab5018d70",
+    ...
+  ]
+}
+```
+
+The payment TXID appears in the block's `tx` array. `nTx: 2` — the coinbase plus this
+payment. This is the step that matters: `gettransaction` naming a block is the
+wallet's claim about where the transaction went, while the block listing the TXID is
+the chain confirming it independently. The two agree.
+
+`previousblockhash` is `3d3ef2fb...`, which was the chain tip in Lab 05 when the
+payment was still unconfirmed — so block 202 was built directly on the state we
+observed then.
+
+Tests:
+
+```
+$ cargo test --test lab_07
+running 4 tests
+test detects_empty_mempool ... ok
+test mines_exactly_one_block ... ok
+test reads_confirmation_count ... ok
+test proves_transaction_is_inside_confirming_block ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
 
 ## Evidence references
 
-TODO: screenshot recommended. Capture the before/after contrast: mempool holding the TXID (from Lab 05) next to the empty mempool and 1 confirmation here. Save to `submissions/evidence/lab07-confirmed.png` and link it. Otherwise replace this line with a description of the terminal evidence, or the section scores 0.
+The before half of the contrast is in Lab 05:
+
+![Before — payment unconfirmed in the mempool](evidence/lab05-unconfirmed-payment.png)
+
+The mempool holding the TXID, `confirmations: 0` with no `blockhash`, and the
+receiver's 1 BTC sitting in `untrusted_pending`.
+
+![After — confirmed in block 202](evidence/lab06-07-decode-and-confirmation.png)
+
+The same transaction after one block. At the foot of the decode:
+`"blockhash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b"`
+and `"confirmations": 1`. Below it the empty `[ ]` from `getrawmempool`, and further
+down a later `gettransaction` reading `"confirmations": 2` after another block was
+mined — depth accumulating on its own as the chain grows.
+
+Both frames come from screen recordings of the `backend1` node terminal in the
+`Week 1 Bitcoin Fundamentals` Polar network.
 
 ## Explanation
 
