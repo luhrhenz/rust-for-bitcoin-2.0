@@ -36,11 +36,137 @@ reads the depth again — so the before and after figures bracket exactly that m
 
 ## Terminal output
 
-TODO: paste the real output. Record from the header: block hash, height, `previousblockhash`, `merkleroot`, `nonce`, `bits`, `difficulty`, `confirmations`, and `chainwork`. Then show `confirmations: 1` before mining and `confirmations: 6` after the five blocks.
+The header of block 202, the block that confirmed the payment:
+
+```
+$ bitcoin-cli getblockheader 56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b
+{
+  "hash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b",
+  "confirmations": 12,
+  "height": 202,
+  "version": 536870912,
+  "merkleroot": "b1af935875515a1ffe55150e1b5e8fa894ecdeb692a218f08747ac5a9508671f",
+  "time": 1785717745,
+  "nonce": 1,
+  "bits": "207fffff",
+  "difficulty": 4.656542373906925e-10,
+  "chainwork": "0000000000000000000000000000000000000000000000000000000000000196",
+  "nTx": 2,
+  "previousblockhash": "3d3ef2fb461a5e1797afc3e087bc4916497de34df3c3ba465fd7eb9b73303604"
+}
+```
+
+| Field | Value | What it commits to |
+| --- | --- | --- |
+| `hash` | `56af9a83...61c36b1b` | this block's identity |
+| `height` | 202 | position in the chain |
+| `previousblockhash` | `3d3ef2fb...73303604` | the parent, making the chain a chain |
+| `merkleroot` | `b1af9358...9508671f` | every transaction in the block, including the payment |
+| `nonce` | 1 | the value varied to satisfy the target |
+| `bits` | `207fffff` | the compact difficulty target |
+| `difficulty` | 4.656542373906925e-10 | that target expressed relative to mainnet |
+| `confirmations` | 12 | depth at the time of this call |
+| `chainwork` | `...00000196` | total work in the chain up to here |
+
+Depth before mining, from the receiver's side:
+
+```
+$ bitcoin-cli -rpcwallet=receiver gettransaction 335c3feb471f8a50b354b8a4717fd53c81162922442fb3aef197de6ab5018d70
+{
+  "amount": 1.00000000,
+  "confirmations": 7,
+  "blockhash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b",
+  "blockheight": 202,
+  ...
+  "lastprocessedblock": {
+    "hash": "2f5b5a81acc4559f42065180052155949e273425bc1fb1fd30b2190b3ba28b04",
+    "height": 208
+  }
+}
+```
+
+Five blocks mined:
+
+```
+$ bitcoin-cli generatetoaddress 5 bcrt1q7wh7mc64cafxddxym3u54sx9z4wulekq06r04s
+[
+  "698640d429bfc8492c77f7ff82b009e7616c9ba8c2aa85cae528d639801dafea",
+  "3d86ad115f1a9a820b7808c51475175024046486dd1449bf69851faace3348e3",
+  "535fd9e2116ec5f395181a214838d5f1dd12b26b670fefbce7339a5d77abb64a",
+  "25db57135874b1bd2ce1facce100e9092def390019f953032c911b7a49617b76",
+  "7a5480eefdbb1d104e09452b896eb1c4dbe915b44f7d90f82e30f9a7aa54f6d6"
+]
+```
+
+Depth after:
+
+```
+$ bitcoin-cli -rpcwallet=receiver gettransaction 335c3feb471f8a50b354b8a4717fd53c81162922442fb3aef197de6ab5018d70
+{
+  "amount": 1.00000000,
+  "confirmations": 12,
+  "blockhash": "56af9a836f4f45c2e2fafff13f82f0ad15411097582f785da4d2bab261c36b1b",
+  "blockheight": 202,
+  ...
+  "lastprocessedblock": {
+    "hash": "7a5480eefdbb1d104e09452b896eb1c4dbe915b44f7d90f82e30f9a7aa54f6d6",
+    "height": 213
+  }
+}
+```
+
+**Depth went 7 → 12: five blocks, five confirmations.** The lab template describes
+this as 1 → 6; on this chain the payment already had extra depth before the step
+began, because a block was mined after Lab 07 confirmed it. I ran the sequence twice,
+and it behaved identically both times — 2 → 7 on the first pass, 7 → 12 on the second.
+Five blocks always buys exactly five confirmations.
+
+Note what did **not** change between the two calls: `blockhash`, `blockheight`,
+`amount`, and the txid are all identical. The transaction was not re-mined or altered.
+Only `confirmations` moved, and it moved because the chain grew on top of it.
+Confirmation depth is not a property of the transaction — it is a measurement of how
+much chain now sits above it.
+
+```
+$ bitcoin-cli getdifficulty
+4.656542373906925e-10
+```
+
+Difficulty on regtest is effectively zero, which is why `nonce` is 1 — the first value
+tried satisfied the target. On mainnet that same field would have required an
+astronomical number of attempts, and that gap is exactly what makes confirmations
+expensive to undo in the real network and free to undo here.
+
+Tests:
+
+```
+$ cargo test --test lab_08
+running 4 tests
+test mines_requested_confirmation_depth ... ok
+test reads_wallet_confirmation_depth ... ok
+test decodes_proof_linked_block_header ... ok
+test proves_one_confirmation_becomes_six ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+```
 
 ## Evidence references
 
-TODO: screenshot recommended. Capture the full `getblockheader` output showing the commitment fields, and the confirmation count changing from 1 to 6. Save to `submissions/evidence/lab08-header.png` and link it. Otherwise replace this line with a description of the terminal evidence, or the section scores 0.
+Both frames are stills from a screen recording of the `backend1` node terminal.
+
+![Depth before the five blocks](evidence/lab08-depth-before.png)
+
+The receiver's `gettransaction` reading `"confirmations": 7` against
+`"blockheight": 202`, with `lastprocessedblock` at height 208. Above it, the previous
+pass through the same sequence ends with `lastprocessedblock` at height 203 — the
+depth-2 reading that the first run started from. The five block hashes returned by
+`generatetoaddress` sit between the two calls.
+
+![Depth after the five blocks](evidence/lab08-depth-after.png)
+
+The same call after mining: `"confirmations": 12`, with `blockhash` and `blockheight`
+unchanged at `56af9a83...` and 202, and `lastprocessedblock` now at height 213. The
+`getdifficulty` result `4.656542373906925e-10` appears at the foot of the frame.
 
 ## Explanation
 
