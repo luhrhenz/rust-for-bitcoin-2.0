@@ -16,8 +16,10 @@ cargo fmt --check
 cargo clippy --all-targets --all-features -- -D warnings
 ```
 
-Current status: **26 tests passing, none ignored**; `cargo fmt --check` and
-`cargo clippy --all-targets --all-features -- -D warnings` both clean.
+Current status: **36 tests passing, none ignored** (32 integration tests plus 4 doc
+tests, three of which are `compile_fail` checks on the Part 10 state machine);
+`cargo fmt --check` and `cargo clippy --all-targets --all-features -- -D warnings`
+both clean.
 
 ## Written answers
 
@@ -232,11 +234,52 @@ Better approaches, roughly in order of effort:
 I kept first-fit because the assignment specifies input order and the tests pin that
 behaviour, but the interesting engineering is in what it gets wrong.
 
-**Part 10 (transaction states)** is optional and not attempted. The natural approach
-would be the typestate pattern — `Transaction<Created>`, `Transaction<Signed>` and so on
-as distinct types, with transitions consuming `self` and returning the next type. That
-makes invalid transitions a compile error rather than a runtime check, which is the same
-lesson as Part 7 applied to state instead of memory.
+**Part 10 — transaction states.** Attempted, in [`src/state.rs`](src/state.rs), using
+the typestate pattern:
+
+```text
+Created ──validate()──> Validated ──sign()──> Signed ──broadcast()──> Broadcast
+   │                                                                      │
+   └──────────────── Rejected <────────── reject() ───────────────────────┤
+                                                                          │
+                                             Confirmed <───confirm()──────┘
+```
+
+`Lifecycle<S>` carries the state in the *type parameter* rather than in a field, and
+each state is its own struct. Every transition takes `self` by value and returns a
+`Lifecycle` of a different type.
+
+Two properties fall out of that, both for free:
+
+- **Invalid transitions do not exist.** There is no `broadcast()` on
+  `Lifecycle<Created>` to call, so skipping validation is not a runtime error to be
+  caught — it is a program that cannot be written. No `if state == ...` guard is
+  needed anywhere, and no test can reach the bad path because the bad path does not
+  compile.
+- **Nothing can be done twice.** `broadcast()` consumes the `Signed` value, so a
+  second call has no value left to operate on. Double-broadcast is the same class of
+  error as the Part 7 use-after-move, and the compiler rejects it for the same reason.
+
+I verified both claims rather than asserting them: `src/state.rs` carries three
+`compile_fail` doc tests — broadcasting from `Created`, signing before validating, and
+broadcasting twice. `cargo test` fails if any of them ever starts compiling, so the
+guarantee is regression-tested rather than merely intended.
+
+States carry data where it is meaningful: `Signed` holds the signature, `Confirmed`
+holds the block height, and `Rejected` holds a `RejectionReason` distinguishing local
+validation failure from network refusal. `Rejected` is reachable from two places, which
+matches reality — a transaction can be refused before it is ever sent, or accepted
+locally and then dropped by the network.
+
+The transaction stays readable in every state through `transaction()`, including after
+rejection, because a rejected transaction is still worth inspecting.
+
+The trade-off worth naming: typestate is awkward when the state must be chosen at
+runtime — you cannot put `Lifecycle<Created>` and `Lifecycle<Signed>` in the same `Vec`,
+since they are different types. A wallet tracking many transactions at mixed stages
+would need an ordinary `enum` wrapper around them, giving up compile-time transition
+checking for the ability to store them together. This model tracks one transaction at a
+time, so the compile-time guarantee is worth more.
 
 ## Example output
 
