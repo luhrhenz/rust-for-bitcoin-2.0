@@ -39,19 +39,18 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 ## Explanation
 
-The checksum in a BIP39 mnemonic is derived by taking the first `ENT/32` bits of
-SHA256(entropy) and appending them to the entropy before splitting into words — it
-exists purely so a wallet can detect that a written-down mnemonic has a mistyped or
-misordered word (the odds of a wrong word count passing the checksum by chance are
-astronomically small), the same role a check digit plays in a credit card number. It
-provides zero secrecy: anyone who can see the checksum bits, or even just knows the
-mnemonic is valid BIP39, learns nothing about the entropy itself beyond what the words
-already reveal, and the checksum computation is fully public and reversible from the
-words. The passphrase, by contrast, is not recorded anywhere in the mnemonic or its
-checksum — BIP39 feeds it directly into the PBKDF2 seed derivation
-(`PBKDF2-HMAC-SHA512(mnemonic, "mnemonic" + passphrase, 2048)`), so it only ever exists
-in the holder's memory. If it's forgotten, there is no checksum, hash, or stored value
-anywhere to check candidate passphrases against except by re-deriving the seed and
-looking for funds on-chain — the mnemonic alone deterministically produces a different,
-equally "valid-looking" wallet for every possible passphrase, with no way to know which
-one (if any) was the one actually used.
+The checksum is the first `ENT/32` bits of SHA256(entropy), appended before the
+words get split out. Its whole job is catching a mistyped or misordered word when
+someone's reading a mnemonic back off paper — same role a check digit plays on a
+credit card number. Nothing more. It's fully public and reversible from the words
+themselves, so it can't hide or protect anything; anyone who sees a valid BIP39
+mnemonic can recompute its checksum trivially.
+
+The passphrase is a completely different mechanism — it never touches the checksum
+or the word list at all. BIP39 feeds it straight into PBKDF2:
+`PBKDF2-HMAC-SHA512(mnemonic, "mnemonic" + passphrase, 2048)`. It only exists in
+whoever's memory holds it. Lose it, and there's nothing to check a guess against —
+no stored hash, no checksum, nothing — except re-deriving the seed and looking for
+funds on-chain. Every possible passphrase produces an equally valid-looking wallet
+from the same mnemonic; there's no way to tell from the mnemonic alone which one (if
+any) was actually used.

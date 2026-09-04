@@ -34,16 +34,15 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 ## Explanation
 
-The scriptPubKey only ever commits to a public key's identity — HASH160(pubkey) — not
-to any authorization to spend. Knowing a public key (or even the hash of one) proves
-nothing on its own; anyone who has ever seen an address knows that hash. Spend
-authorization comes from ScriptSig, which supplies a valid ECDSA signature produced by
-the *private* key matching that public key, over the specific transaction spending the
-output. `OP_CHECKSIG` is the step that connects the two: it takes the signature and
-public key from ScriptSig, re-derives HASH160(pubkey) and compares it against the value
-`OP_EQUALVERIFY` already checked, then verifies the signature against the transaction's
-sighash using that public key. So key identity (the hash) is public and freely
-knowable; spend authorization (the signature) requires the private key and only exists
-once, for the specific transaction being signed — that separation is what makes a
-P2PKH output spendable by exactly one party even though its locking condition is
-visible to everyone.
+The scriptPubKey only commits to identity: HASH160(pubkey). That's public information
+by definition — anyone who's ever seen the address knows that hash, and knowing it
+proves nothing about who's allowed to spend the coin.
+
+Spend authorization is a different thing entirely: a signature over the specific
+spending transaction, produced with the private key. `OP_CHECKSIG` is what ties the
+two together at spend time — it re-derives HASH160(pubkey) from the ScriptSig data,
+checks it matches what `OP_EQUALVERIFY` already confirmed, then verifies the signature
+against the sighash using that same pubkey. The identity check and the authorization
+check happen back to back but they're checking different things. That's the whole
+trick of P2PKH: the lock is visible to the entire chain, but only the private key
+holder can ever produce a signature that passes the second half of the check.

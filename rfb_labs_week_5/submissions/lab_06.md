@@ -33,17 +33,17 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 ## Explanation
 
-Witness data isn't stripped from the transaction or given a single flat discount
-because BIP141 needs to keep the *base* transaction (everything a pre-SegWit node can
-parse: version, inputs, outputs, locktime) fully priced the same as before, while only
-discounting the *new* witness field that old nodes don't even see. That's why weight is
-defined as `stripped_size * 3 + total_size` rather than something like `total_size *
-some_flat_factor`: `stripped_size` (the non-witness part) gets counted three extra
-times so that, combined with the one time it's already included in `total_size`, it
-ends up weighted ×4 — full price. The witness bytes only appear once, in `total_size`,
-so they land at weight ×1, a quarter of the base data's cost per byte. Dividing the
-whole weight by 4 to get virtual size is just a convenience so fee-per-byte math still
-feels like the pre-SegWit vbyte unit, but the underlying asymmetry — base data always
-weighted 4×, witness data always weighted 1× — is what makes SegWit transactions
-cheaper without secretly making the base transaction cheaper too or letting an
-attacker inflate a block by stuffing arbitrary "free" data outside the witness field.
+The reason it's `stripped_size * 3 + total_size` and not some flat multiplier on the
+whole transaction: BIP141 needs the base transaction — version, inputs, outputs,
+locktime, everything a pre-SegWit node can actually parse — priced exactly the same
+as it always was. Only the new witness field gets a discount, because that's the part
+old nodes never see and never validate.
+
+Work through the formula and that's what falls out. `stripped_size` (non-witness)
+gets counted three extra times on top of the one time it's already inside
+`total_size`, landing at weight ×4 — full price, unchanged from pre-SegWit. Witness
+bytes appear once, only in `total_size`, so they land at ×1 — a quarter cost per byte.
+Dividing by 4 to get vbytes is just so fee math still reads in familiar units; the
+real mechanism is that 4:1 split, and it's deliberate — it's what stops SegWit from
+quietly making the base transaction cheaper too, and stops anyone from stuffing
+arbitrary data into a block "for free" outside the witness.

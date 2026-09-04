@@ -36,19 +36,18 @@ P2WPKH/P2TR until `bech32`/`bech32m` are turned on.
 
 ## Explanation
 
-An older wallet accepts `3...` because P2SH addresses use the same Base58Check
-encoding it already understands for `1...` addresses — decoding a P2SH address needs no
-new logic, just a different version byte, so any wallet from the P2SH era (2012
-onward) can build a `3...` output without ever knowing what's hidden inside the
-redeemScript. `bc1q...` addresses use an entirely different encoding, Bech32 (BIP173),
-introduced years later specifically for SegWit — a wallet that predates that BIP
-literally has no decoder for the Bech32 alphabet or its checksum, so it can't even
-parse the string, let alone build a valid output script from it. That's also why
-sending support and spending support are different questions: an old wallet's
-inability to *send to* `bc1q...` is purely an encoding gap on the sender's side and
-says nothing about whether SegWit outputs are spendable — a SegWit-aware node validates
-and spends native SegWit UTXOs fine regardless of which wallets can address them.
-Support for creating an output that pays a given script family (send) and support for
-recognizing and unlocking coins already locked to that script family (spend/receive)
-are controlled by different code paths, so a wallet can lag on one while being fully
-capable on the other.
+`3...` still decodes with Base58Check, same as `1...`, just a different version byte —
+no new logic needed, so any wallet from the P2SH era (2012+) can build that output
+blind, without knowing anything about what's hidden inside the redeemScript.
+
+`bc1q...` is a different encoding altogether — Bech32, from BIP173, introduced years
+later specifically for SegWit. A wallet that predates that BIP has no Bech32 decoder
+at all. It's not that it rejects the address on purpose; it literally can't parse the
+string.
+
+Sending and spending support aren't the same capability, and this is where that
+matters: an old wallet's inability to send to `bc1q...` is a gap in its own encoding
+logic. It says nothing about whether SegWit outputs are actually spendable — any
+SegWit-aware node validates and spends those UTXOs fine. Building an output that pays
+a script family, and recognizing/unlocking a UTXO already locked to that family, are
+different code paths. A wallet can be behind on one and fully caught up on the other.

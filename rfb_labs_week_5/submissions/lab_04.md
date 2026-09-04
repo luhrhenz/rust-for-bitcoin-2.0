@@ -36,19 +36,19 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 ## Explanation
 
-All three formats lock to a hash of a public key, but they differ in where the
-unlocking data lives and how the commitment is read. P2PKH commits to HASH160(pubkey)
-inside a Base58Check-decoded scriptPubKey, and the spender's signature + pubkey go in
-ScriptSig, which is fully counted toward the legacy transaction size. P2SH-wrapped
-SegWit still uses the legacy scriptPubKey shape on the outside
-(`OP_HASH160 <scriptHash> OP_EQUAL`), but the redeemScript it hides is itself a P2WPKH
-program — so ScriptSig carries only that tiny redeemScript push (needed for
-backward-compatible senders that don't understand witness data), while the real
-signature and pubkey move into the witness. Native P2WPKH drops the outer legacy
-wrapper entirely: the scriptPubKey directly *is* the witness program
-(`0 <20-byte-hash>`), ScriptSig is empty, and every byte of unlocking data lives in the
-witness field, which BIP141 discounts to 1/4 weight instead of counting fully like
-ScriptSig does. That's the practical difference this lab measures: same commitment
-concept, but P2PKH pays full weight for its unlock data, P2SH-wrapped SegWit pays a
-small legacy-compatible fee for the wrapper plus discounted witness data, and native
-P2WPKH pays the discount on everything and needs no legacy-compatible wrapper at all.
+Same idea underneath — lock to a hash of a public key — but three different places
+for the unlocking data to live, and that's what actually costs money.
+
+P2PKH: signature and pubkey both go in ScriptSig, counted at full weight, no witness
+involved at all. P2SH-wrapped SegWit keeps the old scriptPubKey shape on the outside
+(`OP_HASH160 <scriptHash> OP_EQUAL`) so legacy senders can still build an output to
+it, but the redeemScript hidden inside is a P2WPKH program — so ScriptSig only
+carries that small redeemScript push, and the actual signature + pubkey move into the
+witness. Native P2WPKH skips the wrapper entirely: the scriptPubKey *is* the witness
+program (`0 <20-byte-hash>`), ScriptSig is empty, everything unlocking-related sits in
+witness data.
+
+Why it matters: BIP141 weights witness bytes at 1/4 of ScriptSig bytes. P2PKH gets no
+discount. P2SH-wrapped SegWit gets a partial discount (small legacy wrapper cost,
+discounted witness). Native P2WPKH gets the full discount and skips the wrapper cost
+too — which is exactly the vbyte gap this lab's tests are built to demonstrate.

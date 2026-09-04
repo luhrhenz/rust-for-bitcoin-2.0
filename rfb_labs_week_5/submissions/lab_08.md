@@ -42,30 +42,24 @@ provides no public-only path to it, which the explanation below covers.
 
 ## Explanation
 
-The chain code is 256 bits of extra entropy stored alongside every extended key,
-mixed into HMAC-SHA512 at each derivation step together with the parent key. Its
-purpose is to make each child key's derivation depend on more than just an incrementing
-index over the parent public key — without it, anyone could derive the same "child"
-keys from just the parent public key and a guessed index, since EC public-key math
-alone is fully public and reversible in that sense. The chain code is the secret
-(for hardened derivation) or semi-public but structured (for normal derivation)
-salt that ties each child deterministically to its specific parent, so the whole tree
-is reproducible from the master seed but not guessable from public keys alone.
+Chain code: 256 extra bits carried alongside every extended key, mixed into
+HMAC-SHA512 at each derivation step along with the parent key. Without it, deriving a
+"child" would just be an index over the parent's public key — and EC point math is
+public and reversible, so anyone could reproduce the same children from the parent
+pubkey and a guessed index. The chain code is what makes derivation depend on
+something not recoverable from the public key alone.
 
-An xpub (extended public key = public key + chain code) is meant for watch-only use: a
-wallet, exchange, or block explorer holding only the xpub can derive every *normal*
-(non-hardened) child public key and every address the account will ever use, and so can
-monitor incoming payments and generate fresh receive addresses, without ever being able
-to sign a transaction or otherwise move funds — that capability requires the matching
-private key, which the xpub does not contain.
+xpub is public key + chain code, and that's exactly what watch-only use needs: an
+exchange or a block explorer holding only the xpub can derive every non-hardened
+child pubkey and every address the account will ever produce, so it can watch for
+incoming payments and hand out fresh receive addresses — but it can't sign anything,
+because it never has the private key.
 
-Hardened children cannot be derived from a parent xpub because CKDpub (child key
-derivation for hardened indices) is defined in BIP32 to hash the parent's *private*
-key, not its public key, into the HMAC-SHA512 input, specifically because deriving from
-the public key would create a hazard: if any one child private key and the parent xpub
-ever both leaked, the whole parent chain code and (for normal derivation) the parent
-private key become recoverable, compromising every other child in the tree. Hardened
-derivation breaks that chain by requiring the parent's actual private key, so leaking
-one hardened child's private key (plus the parent xpub) reveals nothing about siblings
-or the parent — that's exactly why account-level and higher path segments in BIP44 are
-always hardened.
+Hardened children can't come from an xpub because BIP32 defines hardened derivation
+(CKDpub for hardened indices doesn't even exist) to hash the parent's *private* key
+into HMAC-SHA512, not the public key. That's deliberate — deriving from the pubkey
+would mean that if one child's private key and the parent xpub ever both leaked, the
+parent's chain code (and for normal derivation, the parent private key too) becomes
+recoverable, and the whole sibling tree goes with it. Hardened derivation breaks that
+chain: leaking one hardened child tells you nothing about its siblings or its parent.
+Which is why BIP44 hardens everything at account level and above.

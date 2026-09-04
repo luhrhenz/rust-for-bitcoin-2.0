@@ -42,9 +42,17 @@ both `inspect_address` and `script_pubkey_hex`.
 
 ## Explanation
 
-A prefix is only a hint about which encoding and script family an address probably  uses — it's the first character(s) of a Base58Check or Bech32/Bech32m string, and nothing about parsing that prefix confirms the rest of the string is well-formed. Base58Check addresses carry a 4-byte checksum (double-SHA256 of the payload) and Bech32/Bech32m addresses carry a polynomial checksum over the whole HRP + data part; either one catches a typo, a dropped character, or a flipped digit that a prefix-only check would miss and let through as "looks like a P2PKH address." Network validation is a separate concern from the checksum: a mainnet P2PKH address and a testnet P2PKH address use different version bytes, so an address can pass its own checksum perfectly and still be encoded for the wrong chain. That's why `inspect_address` uses
-`Address::from_str(..)?.require_network(network)?` — `from_str` alone only tells you the
-string decodes to *some* valid, checksummed address; `require_network` is what refuses
-to hand back an address unless it matches the network the caller actually expects,
-which is exactly the mistake a wallet would make if it paid a mainnet address while
-believing it was on testnet, or vice versa.
+`identify_prefix` is a guess, nothing more — it looks at the first couple of
+characters and stops. It can't tell you if the rest of the string is even valid
+base58 or bech32, let alone whether it belongs to the network you think you're on.
+
+That's the whole reason `inspect_address` doesn't just do a prefix check and call it
+done. Base58Check addresses carry a 4-byte double-SHA256 checksum; Bech32/Bech32m
+carries its own polynomial checksum over the HRP and data. Either one catches a typo
+or a dropped character that a prefix match would happily let through. But checksum
+validity and network correctness are two separate questions — a mainnet P2PKH and a
+testnet P2PKH differ only in their version byte, so a perfectly checksummed address
+can still be for the wrong chain entirely. `from_str` proves the checksum is good.
+`require_network` is the part that actually stops you from paying a mainnet address
+while your wallet thinks it's on testnet (or the reverse) — that's a real class of
+bug, not a hypothetical one.

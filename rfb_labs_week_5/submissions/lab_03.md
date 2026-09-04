@@ -35,15 +35,18 @@ test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 ## Explanation
 
-P2SH splits validation into two independent layers, and satisfying only the outer one
-proves nothing about the inner rule. The outer scriptPubKey,
-`OP_HASH160 <scriptHash> OP_EQUAL`, only checks that the spender supplies *some* script
-whose HASH160 matches the committed hash — that's necessary, because it's what lets a
-sender pay to a short, fixed-size address without knowing the multisig details, but it
-is not sufficient to spend the coins. Once that hash check passes, the redeemScript
-itself is pushed onto the stack and executed as if it were the real scriptPubKey: `2
-<pub1> <pub2> <pub3> 3 OP_CHECKMULTISIG` then demands two valid signatures out of the
-three named public keys against the actual spending transaction. So matching the hash
-only proves the spender knows the *correct script text*, not that they hold any of the
-required private keys — the inner OP_CHECKMULTISIG is the layer that actually enforces
-the 2-of-3 spending policy the address was created to represent.
+Two layers, two different jobs. The outer scriptPubKey — `OP_HASH160 <scriptHash>
+OP_EQUAL` — only checks that whoever's spending can produce a script whose hash
+matches what's committed on-chain. That's necessary (it's the whole reason a sender
+can pay a short fixed-size address without ever seeing the multisig setup), but it
+isn't remotely sufficient. Once a P2SH output has been spent once, the redeemScript
+is sitting in the chain's history for anyone to read — so passing the outer hash
+check again on a later output using the same script proves nothing about key
+ownership either.
+
+The actual spending rule lives one layer down. Once the hash matches, the
+redeemScript itself gets pushed and run as the real scriptPubKey:
+`2 <pub1> <pub2> <pub3> 3 OP_CHECKMULTISIG`, which demands two valid signatures out of
+the three named keys against the real spending transaction. So matching the outer
+hash proves you know the correct script text. It says nothing about whether you hold
+any of the three private keys — that's entirely down to OP_CHECKMULTISIG.

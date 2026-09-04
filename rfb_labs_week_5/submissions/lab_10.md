@@ -41,26 +41,21 @@ type `1'`):
 
 ## Explanation
 
-Identical recovery inputs reproduce the same address because every step from mnemonic
-to address is a pure function: `Mnemonic::to_seed(passphrase)` is deterministic PBKDF2
-over fixed inputs, `Xpriv::new_master` and every `derive_priv` step down a fixed
-`DerivationPath` are deterministic HMAC-SHA512 operations with no external randomness,
-and turning a public key into an address is a deterministic hash-and-encode. Nowhere in
-that chain is anything drawn from an RNG or system clock — given the same mnemonic,
-passphrase, and path, the output key and address are mathematically forced to be the
-same every time, which is the entire point of "deterministic" in HD wallets: it's what
-lets 12 or 24 words stand in for an entire tree of keys without storing the tree
-itself.
+Every step from mnemonic to address is a pure function — no RNG, no clock, nothing
+external anywhere in the chain. `to_seed` is deterministic PBKDF2 over fixed inputs.
+`new_master` and every `derive_priv` step down a fixed path is deterministic
+HMAC-SHA512. Turning a pubkey into an address is deterministic hashing and encoding.
+Same mnemonic, same passphrase, same path — the output is mathematically forced to be
+identical every time. That's the entire point of "deterministic" in HD wallets: 12 or
+24 words standing in for an entire tree of keys, with nothing else to remember.
 
-But restoring a wallet from a mnemonic is not only about reproducing the *key* — the
-key at a given path is always the same, but which *addresses* a wallet shows the user
-depends on the script-family and path convention (BIP44 vs BIP49 vs BIP84, and even
-gap-limit scanning behavior) that the software applies on top of that key. This lab's
-`derive_address_for_path` test makes that concrete: the exact same derived key at
-`m/44'/1'/0'/0/0` produces a different address depending on whether it's encoded as
-P2PKH or P2WPKH. If a wallet restores a mnemonic assuming BIP84 (native SegWit) but the
-funds were originally received at BIP44 (legacy) or BIP49 (wrapped SegWit) addresses
-derived from that same seed, the recovered wallet will scan the wrong branch entirely
-and report a zero balance — not because the key derivation failed, but because the
-script-family convention it assumed doesn't match the one originally used to receive
-the coins.
+But the key being reproducible isn't the whole story of "recovery." The key at a
+given path is always the same key — what address gets shown for it depends on the
+script-family convention layered on top (BIP44 vs BIP49 vs BIP84), and that's a
+software choice, not something baked into the derivation. `derive_address_for_path`
+makes this concrete: the exact same derived key at `m/44'/1'/0'/0/0` produces a
+different address depending on whether you encode it as P2PKH or P2WPKH. So if a
+wallet restores a mnemonic assuming BIP84 but the coins were actually received at
+BIP44 or BIP49 addresses from that same seed, it scans the wrong branch and reports a
+zero balance — not because anything about the derivation failed, but because the
+script-family convention it guessed doesn't match the one that was actually used.
